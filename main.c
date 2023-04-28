@@ -35,7 +35,7 @@ enum STRANA{
 //function prototypes
 void cntrlEvent(SDL_Window *, bool *, Pos *);
 void rend(SDL_Renderer *, Pos *, Circle *);
-void inputCntrl(int *);
+void inputCntrl(int *, bool *);
 void control_snake(Pos *, int);
 void find_circle_loc(Circle *, Pos *);
 void init(Pos *, Circle *);
@@ -58,18 +58,12 @@ void cntrlEvent(SDL_Window *window, bool *end, Pos *poz){
                     (*end) = 0;
                 }
                 break;
-            case SDL_KEYDOWN:
-                switch(event.key.keysym.sym){
-                    case SDLK_ESCAPE:
-                        (*end) = 0;
-                        break;
-                }
-                break;
             case SDL_QUIT:
                 (*end) = 0;
                 break;
         }
     }
+             
 
 }
 
@@ -105,7 +99,7 @@ void rend(SDL_Renderer *renderer, Pos *poz, Circle *circ){
 }
 
 
-void inputCntrl(int *strana){
+void inputCntrl(int *strana, bool *end){
 
      const uint8_t *state = SDL_GetKeyboardState(NULL);
 
@@ -113,6 +107,7 @@ void inputCntrl(int *strana){
     if((state[SDL_SCANCODE_D] || state[SDL_SCANCODE_RIGHT]) && *strana != LEVO ) *strana =  DESNO;
     if((state[SDL_SCANCODE_W] || state[SDL_SCANCODE_UP]   ) && *strana != DOLE ) *strana =  GORE;
     if((state[SDL_SCANCODE_S] || state[SDL_SCANCODE_DOWN] ) && *strana != GORE ) *strana =  DOLE;
+    if((state[SDL_SCANCODE_Z] && state[SDL_SCANCODE_LSHIFT])) *end = 0;
 
 }
 
@@ -232,7 +227,7 @@ int main(int argc, char *argv[]){
     while(end){
         cntrlEvent(window, &end, poz);
         rend(renderer, poz, &circ);
-        inputCntrl(&strana);      
+        inputCntrl(&strana, &end);
         colldet(&circ, poz, &end);
         control_snake(poz, strana);
         SDL_Delay(40);
