@@ -1,4 +1,4 @@
-# snake-Sdl
+# snake-sdl
 snake game poorly written in C using SDL
 
 ## Build
