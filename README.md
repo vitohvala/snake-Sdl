@@ -8,6 +8,11 @@ snake game poorly written in C using SDL
   $ make
   $ ./snake
 ```
+### Run WASM version
+```console
+  $ python -m 8080 
+  $ firefox http://localhost:8080/
+```
 You'll need:
   * SDL2
   * make

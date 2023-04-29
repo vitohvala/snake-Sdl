@@ -1,10 +1,17 @@
 #include "SDL2/SDL.h"
+#include <SDL2/SDL_render.h>
+#include <SDL2/SDL_surface.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdbool.h>
 #include <time.h>
 #include <math.h>
+
+
+#ifdef __EMSCRIPTEN__
+#include "emscripten.h"
+#endif
 
 #define WIDTH 400
 #define HEIGHT 400
@@ -13,6 +20,7 @@
 
 //Global variables
 int snake_size;
+int strana = 0;
 
 //Structs
 typedef struct {
@@ -24,59 +32,53 @@ typedef struct{
     int score;
 }Circle; 
 
+typedef struct{
+    SDL_Window *window;
+    SDL_Renderer *renderer;
+} SDL_S;
+
+typedef struct{
+    Circle circ;
+    Pos poz[10000];
+    SDL_S sdl_s;
+} Game; 
+
 //Enums
 enum STRANA{
-    LEVO = 1,
-    DESNO,
-    GORE,
-    DOLE
+    LEFT = 1,
+    RIGHT,
+    UP,
+    DOWN
 };
 
 //function prototypes
-void cntrlEvent(SDL_Window *, bool *, Pos *);
-void rend(SDL_Renderer *, Pos *, Circle *);
-void inputCntrl(int *, bool *);
+void rend(SDL_S *, Pos *, Circle *);
+void inputCntrl(int *, bool *, SDL_S *);
 void control_snake(Pos *, int);
 void find_circle_loc(Circle *, Pos *);
-void init(Pos *, Circle *);
+void init(Pos *, Circle *, SDL_S *);
 void colldet(Circle *, Pos *, bool *);
-int main(int argc, char **argv);
+void gameLoop(void *arg);
+int main(void);
 
 /***************
  ** SDL STUFF **
  ***************/
-void cntrlEvent(SDL_Window *window, bool *end, Pos *poz){
 
-    SDL_Event event;
+void rend(SDL_S *sdl_s, Pos *poz, Circle *circ){
 
-    while(SDL_PollEvent(&event)){
-        switch(event.type){
-            case SDL_WINDOWEVENT_CLOSE:
-                if(window){
-                    SDL_DestroyWindow(window);
-                    window = NULL;
-                    (*end) = 0;
-                }
-                break;
-            case SDL_QUIT:
-                (*end) = 0;
-                break;
-        }
-    }
-             
+    SDL_SetRenderDrawColor(sdl_s->renderer,  0, 0, 0, 0);
 
-}
+    SDL_RenderClear(sdl_s->renderer);
 
-void rend(SDL_Renderer *renderer, Pos *poz, Circle *circ){
+    SDL_SetRenderDrawColor(sdl_s->renderer, 243, 135, 21 , 255);
+    SDL_Rect rect = { poz[0].x, poz[0].y, WSNAK, HSNAK };
+    SDL_RenderFillRect(sdl_s->renderer, &rect);
 
-    SDL_SetRenderDrawColor(renderer,  0, 0, 0, 0);
-
-    SDL_RenderClear(renderer);
-
-    for(int i = 0; i < snake_size; i++){
-        SDL_SetRenderDrawColor(renderer,62, 254, 35, 255);
+    for(int i = 1; i < snake_size; i++){
+        SDL_SetRenderDrawColor(sdl_s->renderer,62, 254, 35, 255);
         SDL_Rect rect = { poz[i].x, poz[i].y, WSNAK, HSNAK };
-        SDL_RenderFillRect(renderer, &rect);
+        SDL_RenderFillRect(sdl_s->renderer, &rect);
     }
 
     if(!(circ->score % 30) && circ->score)
@@ -89,26 +91,58 @@ void rend(SDL_Renderer *renderer, Pos *poz, Circle *circ){
             int dx = circ->radius - i;
             int dy = circ->radius - j;
             if ((dx*dx + dy*dy) <= (circ->radius * circ->radius)) {
-                SDL_RenderDrawPoint(renderer, circ->x + dx, circ->y + dy);
+                SDL_RenderDrawPoint(sdl_s->renderer, circ->x + dx, circ->y + dy);
             }
         }
     }
 
-    SDL_RenderPresent(renderer);
+    SDL_RenderPresent(sdl_s->renderer);
 
 }
 
 
-void inputCntrl(int *strana, bool *end){
+void inputCntrl(int *strana, bool *end, SDL_S *sdl_s){
 
-     const uint8_t *state = SDL_GetKeyboardState(NULL);
+    SDL_Event event;
 
-    if((state[SDL_SCANCODE_A] || state[SDL_SCANCODE_LEFT] ) && *strana != DESNO && *strana) *strana =  LEVO;
-    if((state[SDL_SCANCODE_D] || state[SDL_SCANCODE_RIGHT]) && *strana != LEVO ) *strana =  DESNO;
-    if((state[SDL_SCANCODE_W] || state[SDL_SCANCODE_UP]   ) && *strana != DOLE ) *strana =  GORE;
-    if((state[SDL_SCANCODE_S] || state[SDL_SCANCODE_DOWN] ) && *strana != GORE ) *strana =  DOLE;
-    if((state[SDL_SCANCODE_Z] && state[SDL_SCANCODE_LSHIFT])) *end = 0;
+    while (SDL_PollEvent(&event)) {
+        switch (event.type) {
+            case SDL_WINDOWEVENT_CLOSE:
+                if(sdl_s->window){
+                    SDL_DestroyWindow(sdl_s->window);
+                    sdl_s->window = NULL;
+                    (*end) = 0;
+                }
+                break;
+            case SDL_QUIT:
+                (*end) = 0;
+                break;
 
+            case SDL_KEYDOWN:
+                switch (event.key.keysym.sym) {
+                    case SDLK_a:
+                    case SDLK_LEFT:
+                        if (*strana != RIGHT && *strana) *strana = LEFT;
+                        break;
+                    case SDLK_d:
+                    case SDLK_RIGHT:
+                        if (*strana != LEFT) *strana = RIGHT;
+                        break;
+                    case SDLK_w:
+                    case SDLK_UP:
+                        if (*strana != DOWN) *strana = UP;
+                        break;
+                    case SDLK_s:
+                    case SDLK_DOWN:
+                        if (*strana != UP) *strana = DOWN;
+                        break;
+                    case SDLK_z:
+                        if (SDL_GetModState() & KMOD_LSHIFT) *end = false;
+                        break;
+                }
+                break;
+        }
+    }
 }
 
 /****************************************************************
@@ -123,28 +157,28 @@ void control_snake(Pos *poz, int strana){
         }
     }
     switch(strana){
-        case LEVO:
+        case LEFT:
             poz[0].x-= WSNAK;
             break;
-        case DESNO:
+        case RIGHT:
             poz[0].x+= WSNAK;
             break;
-        case GORE:
+        case UP:
             poz[0].y -= HSNAK;
             break;
-        case DOLE:
+        case DOWN:
             poz[0].y += HSNAK;
             break;
         default:
             break;
     }
-    if(strana == DOLE && poz->y >= HEIGHT)
+    if(strana == DOWN && poz->y >= HEIGHT)
         poz->y = 0;
-    if(strana == GORE && poz->y <= 0 - HSNAK)
+    if(strana == UP && poz->y <= 0 - HSNAK)
         poz->y = HEIGHT;
-    if(strana == LEVO && poz->x <= 0)
+    if(strana == LEFT && poz->x <= 0)
         poz->x = WIDTH;
-    if(strana == DESNO && poz->x >= WIDTH)
+    if(strana == RIGHT && poz->x >= WIDTH)
         poz->x = 0 ;
 
 
@@ -194,8 +228,9 @@ void colldet(Circle *circ, Pos *poz, bool *end){
  *                       Initialize variables                   *
  ****************************************************************/
 
-void init(Pos *poz, Circle *circ){
+void init(Pos *poz, Circle *circ, SDL_S *sdl_s){
 
+    snake_size = 15;
     poz[0].x = WIDTH/2 - 1;
     poz[0].y = HEIGHT/2 - 1;
     for(int i = 1; i < snake_size; i++){
@@ -206,35 +241,54 @@ void init(Pos *poz, Circle *circ){
     find_circle_loc(circ, poz);
     circ->radius = 5;
     circ->score = 0;
+    SDL_CreateWindowAndRenderer(WIDTH, HEIGHT, 0, &sdl_s->window, &sdl_s->renderer);
+
 }
-
-int main(int argc, char *argv[]){
-    
-    Circle circ;
-    Pos poz[10000]; 
-    int strana = 0;
+void gameLoop(void *arg){
     bool end = 1;
-    snake_size = 15;
-    init(poz, &circ);
+    Game *game = (Game *) arg;
 
-    SDL_Window *window = SDL_CreateWindow("Window", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-                               WIDTH, HEIGHT, 0
-                            );
-
-    SDL_Renderer *renderer = SDL_CreateRenderer(window, -1 ,SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-    SDL_Init(SDL_INIT_VIDEO);
-
+#ifdef __EMSCRIPTEN__
+#define P 1
+#else
     while(end){
-        cntrlEvent(window, &end, poz);
-        rend(renderer, poz, &circ);
-        inputCntrl(&strana, &end);
-        colldet(&circ, poz, &end);
-        control_snake(poz, strana);
-        SDL_Delay(40);
-    }
+#endif
+        inputCntrl(&strana, &end, &game->sdl_s);
+        colldet(&game->circ, game->poz, &end);
+        control_snake(game->poz, strana);
+        rend(&game->sdl_s, game->poz, &game->circ);
 
-    SDL_DestroyWindow(window);
-    SDL_DestroyRenderer(renderer);
+        SDL_Delay(40);
+#ifdef __EMSCRIPTEN__
+#define P 1
+        if(!end){
+            strana = 0;
+            emscripten_cancel_main_loop();
+            main();
+        }
+#else
+    }
+#endif
+}
+int main(void){
+
+    SDL_Init(SDL_INIT_VIDEO);
+    SDL_InitSubSystem(SDL_INIT_EVENTS);
+    Game game;
+
+    init(game.poz, &game.circ, &game.sdl_s);
+
+#ifdef __EMSCRIPTEN__
+    emscripten_set_main_loop_arg(gameLoop, &game,0, 1);
+    emscripten_set_main_loop_timing(EM_TIMING_RAF, 0);
+#else
+    gameLoop(&game);
+#endif
+
+    SDL_DestroyWindow(game.sdl_s.window);
+    SDL_DestroyRenderer(game.sdl_s.renderer);
+
+
 
     SDL_Quit();
 
