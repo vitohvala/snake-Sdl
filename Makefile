@@ -1,12 +1,12 @@
 ECC = emcc
 CC = cc
 CFLAGS = -g -Wall -pedantic -lm
-CLIBS = `sdl2-config --cflags --libs`
+CLIBS = `sdl2-config --cflags --libs` -lSDL2_ttf
 
-CFLAGSECC = -s USE_SDL=2 -s WASM=1 -s STACK_SIZE=650000
+CFLAGSECC = -s USE_SDL=2 -s USE_SDL_TTF=2 --preload-file fonts -s WASM=1 -s STACK_SIZE=850000
 
-SRC = src/main.c
-TARGETECC = WASM/index.js
+SRC = main.c
+TARGETECC = index.html
 TARGET = snake
 
 all: $(TARGET)  
