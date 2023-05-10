@@ -10,7 +10,7 @@ snake game poorly written in C using SDL
 ```
 ### Run WASM version
 ```console
-  $ python -m 8080 
+  $ python -m http.server 8080 
   $ firefox http://localhost:8080/
 ```
 You'll need:
